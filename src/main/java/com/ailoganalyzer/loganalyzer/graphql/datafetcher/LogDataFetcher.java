@@ -3,33 +3,33 @@ package com.ailoganalyzer.loganalyzer.graphql.datafetcher;
 import com.ailoganalyzer.loganalyzer.model.Log;
 import com.ailoganalyzer.loganalyzer.repository.LogElasticsearchRepository;
 import com.ailoganalyzer.loganalyzer.repository.LogRepository;
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsQuery;
-import com.netflix.graphql.dgs.InputArgument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.stereotype.Controller;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@DgsComponent
+@Controller
 @RequiredArgsConstructor
 public class LogDataFetcher {
 
     private final LogRepository logRepository;
     private final LogElasticsearchRepository logElasticsearchRepository;
 
-    @DgsQuery
-    public Optional<Log> log(@InputArgument String id) {
+    @QueryMapping
+    public Optional<Log> log(@Argument String id) {
         return logRepository.findById(Long.valueOf(id));
     }
 
-    @DgsQuery
-    public Map<String, Object> logs(@InputArgument Map<String, Object> filter, 
-                                    @InputArgument Map<String, Object> page) {
+    @QueryMapping
+    public Map<String, Object> logs(@Argument Map<String, Object> filter, 
+                                    @Argument Map<String, Object> page) {
         
         int pageNumber = page != null ? (int) page.getOrDefault("page", 0) : 0;
         int pageSize = page != null ? (int) page.getOrDefault("size", 20) : 20;

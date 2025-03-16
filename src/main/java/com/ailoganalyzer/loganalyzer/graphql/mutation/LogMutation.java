@@ -6,17 +6,17 @@ import com.ailoganalyzer.loganalyzer.model.MetadataField;
 import com.ailoganalyzer.loganalyzer.model.Severity;
 import com.ailoganalyzer.loganalyzer.repository.LogElasticsearchRepository;
 import com.ailoganalyzer.loganalyzer.repository.LogRepository;
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsMutation;
-import com.netflix.graphql.dgs.InputArgument;
 import lombok.RequiredArgsConstructor;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.stereotype.Controller;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@DgsComponent
+@Controller
 @RequiredArgsConstructor
 public class LogMutation {
 
@@ -24,8 +24,8 @@ public class LogMutation {
     private final LogElasticsearchRepository logElasticsearchRepository;
     private final LogSubscription logSubscription;
 
-    @DgsMutation
-    public Log ingestLog(@InputArgument Map<String, Object> input) {
+    @MutationMapping
+    public Log ingestLog(@Argument Map<String, Object> input) {
         // Convert the input to a Log object
         Log log = new Log();
         

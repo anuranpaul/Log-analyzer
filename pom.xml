@@ -76,6 +76,12 @@
             <artifactId>spring-graphql-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>co.elastic.clients</groupId>
+            <artifactId>elasticsearch-java</artifactId>
+            <version>8.17.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>
