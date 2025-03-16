@@ -1,0 +1,75 @@
+type Query {
+    logs(filter: LogFilter, page: PageInput): LogPage
+    log(id: ID!): Log
+    findLogsByApplicationAndSeverity(application: String!, severity: Severity!): [Log]
+}
+
+type Mutation {
+    ingestLog(input: LogInput!): Log
+}
+
+type Subscription {
+    logAlerts(severity: [Severity!]): Log
+}
+
+type Log {
+    id: ID!
+    timestamp: String!
+    application: String!
+    message: String!
+    severity: Severity!
+    source: String
+    host: String
+    metadata: [MetadataField]
+}
+
+type MetadataField {
+    key: String!
+    value: String!
+}
+
+enum Severity {
+    INFO
+    DEBUG
+    WARNING
+    ERROR
+    CRITICAL
+}
+
+input LogInput {
+    timestamp: String!
+    application: String!
+    message: String!
+    severity: Severity!
+    source: String
+    host: String
+    metadata: [MetadataInput]
+}
+
+input MetadataInput {
+    key: String!
+    value: String!
+}
+
+input LogFilter {
+    applications: [String!]
+    startTime: String
+    endTime: String
+    severities: [Severity!]
+    messageContains: String
+    sources: [String!]
+    hosts: [String!]
+}
+
+input PageInput {
+    page: Int = 0
+    size: Int = 20
+}
+
+type LogPage {
+    content: [Log!]
+    totalElements: Int!
+    totalPages: Int!
+    pageNumber: Int!
+    pageSize: Int!
+} 
