@@ -59,6 +59,12 @@ input LogFilter {
     messageContains: String
     sources: [String!]
     hosts: [String!]
+    metadata: MetadataFilter
+}
+
+input MetadataFilter {
+    key: String!
+    value: String!
 }
 
 input PageInput {

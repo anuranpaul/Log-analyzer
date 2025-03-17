@@ -35,9 +35,24 @@ public class LogController {
         long totalElements;
         
         if (filter != null && !filter.isEmpty()) {
-            // Use Elasticsearch for filtered queries
-            logs = logService.search(filter, pageNumber, pageSize);
-            totalElements = logs.size(); // For simplicity, we're not counting total results
+            // Check if we're filtering by metadata
+            if (filter.containsKey("metadata")) {
+                Map<String, String> metadataFilter = (Map<String, String>) filter.get("metadata");
+                if (metadataFilter != null && metadataFilter.containsKey("key") && metadataFilter.containsKey("value")) {
+                    String key = metadataFilter.get("key");
+                    String value = metadataFilter.get("value");
+                    logs = logService.findByMetadata(key, value, pageNumber, pageSize);
+                    totalElements = logs.size(); // For simplicity, we're not counting total results
+                } else {
+                    // Use Elasticsearch for filtered queries
+                    logs = logService.search(filter, pageNumber, pageSize);
+                    totalElements = logs.size(); // For simplicity, we're not counting total results
+                }
+            } else {
+                // Use Elasticsearch for filtered queries
+                logs = logService.search(filter, pageNumber, pageSize);
+                totalElements = logs.size(); // For simplicity, we're not counting total results
+            }
         } else {
             // Use JPA for simple pagination
             Page<Log> logPage = logService.findAll(pageNumber, pageSize);

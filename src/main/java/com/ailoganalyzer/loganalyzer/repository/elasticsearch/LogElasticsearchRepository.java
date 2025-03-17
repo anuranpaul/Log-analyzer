@@ -42,4 +42,12 @@ public interface LogElasticsearchRepository extends ElasticsearchRepository<Log,
             Instant startTime, 
             Instant endTime, 
             Pageable pageable);
+    
+    // Custom query to find logs by metadata key and value
+    @Query("{\"nested\": {\"path\": \"metadata\", \"query\": {\"bool\": {\"must\": [{\"term\": {\"metadata.key\": \"?0\"}}, {\"term\": {\"metadata.value\": \"?1\"}}]}}}}")
+    List<Log> findByMetadataKeyAndValue(String key, String value);
+    
+    // Custom query to find logs by metadata key and value with pagination
+    @Query("{\"nested\": {\"path\": \"metadata\", \"query\": {\"bool\": {\"must\": [{\"term\": {\"metadata.key\": \"?0\"}}, {\"term\": {\"metadata.value\": \"?1\"}}]}}}}")
+    Page<Log> findByMetadataKeyAndValue(String key, String value, Pageable pageable);
 } 

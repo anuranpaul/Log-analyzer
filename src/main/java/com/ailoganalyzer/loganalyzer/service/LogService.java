@@ -144,6 +144,19 @@ public class LogService {
                 }
             }
 
+            // Filter by metadata
+            if (filter.containsKey("metadata")) {
+                Map<String, String> metadataFilter = (Map<String, String>) filter.get("metadata");
+                if (metadataFilter != null && metadataFilter.containsKey("key") && metadataFilter.containsKey("value")) {
+                    String key = metadataFilter.get("key");
+                    String value = metadataFilter.get("value");
+                    
+                    // Use the direct repository method instead of building a complex query
+                    List<Log> logsWithMetadata = logElasticsearchRepository.findByMetadataKeyAndValue(key, value);
+                    return logsWithMetadata;
+                }
+            }
+
             // Filter by sources
             if (filter.containsKey("sources")) {
                 List<String> sources = (List<String>) filter.get("sources");
@@ -231,5 +244,9 @@ public class LogService {
         return searchHits.stream()
                 .map(SearchHit::getContent)
                 .collect(Collectors.toList());
+    }
+
+    public List<Log> findByMetadata(String key, String value, int page, int size) {
+        return logElasticsearchRepository.findByMetadataKeyAndValue(key, value, PageRequest.of(page, size)).getContent();
     }
 }
