@@ -2,30 +2,136 @@
 
 This project is a modern log analysis system that allows for efficient storage, retrieval, and real-time monitoring of application logs using a GraphQL API. It leverages AI capabilities for advanced log analysis and pattern detection.
 
+## Technology Stack Overview
+
+### Core Technologies
+
+#### Spring Boot 3
+- **Purpose**: Serves as our application framework and provides core infrastructure
+- **Usage in our system**:
+  - Dependency injection and application configuration
+  - RESTful service support (though we primarily use GraphQL)
+  - Integration with JPA, Elasticsearch, and Kafka
+  - Transaction management and database connections
+  - Application lifecycle management
+
+#### Spring GraphQL
+- **Purpose**: Provides a flexible, efficient API layer for log data access
+- **Usage in our system**:
+  - Defining schema-first API design
+  - Handling complex log queries with nested filters
+  - Supporting real-time log subscriptions (upcoming)
+  - Reducing over-fetching and under-fetching of log data
+  - Enabling clients to request exactly the log fields they need
+
+### Data Storage & Search
+
+#### PostgreSQL
+- **Purpose**: Primary persistent storage for log data
+- **Usage in our system**:
+  - Storing structured log data with ACID guarantees
+  - Maintaining relationships between logs and metadata
+  - Providing transactional consistency for log ingestion
+  - Supporting complex SQL queries when needed
+  - Serving as the source of truth for log data
+
+#### Elasticsearch
+- **Purpose**: Advanced search and analytics engine
+- **Usage in our system**:
+  - Full-text search across log messages
+  - Real-time log data indexing
+  - Complex queries on log metadata
+  - Time-based log analysis
+  - Aggregations and analytics on log data
+  - Efficient filtering and faceted search
+
+### Message Processing
+
+#### Apache Kafka
+- **Purpose**: Reliable log message streaming and processing
+- **Usage in our system**:
+  - Decoupling log ingestion from processing
+  - Ensuring reliable delivery of log messages
+  - Enabling async processing of logs
+  - Supporting high-throughput log ingestion
+  - Providing message persistence and replay capabilities
+  - Facilitating future integration with other systems
+
+#### Apache Zookeeper
+- **Purpose**: Manages Kafka cluster coordination
+- **Usage in our system**:
+  - Maintaining Kafka broker configurations
+  - Managing topic configurations
+  - Handling leader election for Kafka partitions
+  - Providing distributed synchronization
+
+### Real-time Communication (Upcoming)
+
+#### WebSockets
+- **Purpose**: Enable real-time log alerts and monitoring
+- **Planned usage**:
+  - Supporting GraphQL subscriptions
+  - Real-time log event notifications
+  - Live dashboard updates
+  - Instant alert delivery
+  - Bi-directional communication for interactive features
+
+## System Architecture
+
+Our log analyzer implements a modern event-driven architecture:
+
+1. **Log Ingestion Flow**:
+   - Logs are received through GraphQL mutations
+   - Stored in PostgreSQL for persistence
+   - Published to Kafka for async processing
+   - Consumed and indexed in Elasticsearch
+
+2. **Query Flow**:
+   - Simple queries served directly from PostgreSQL
+   - Complex search queries routed to Elasticsearch
+   - Real-time alerts handled via WebSocket subscriptions
+
+3. **Processing Flow**:
+   - Kafka ensures reliable message processing
+   - Enables future extension for:
+     - Log aggregation
+     - Pattern detection
+     - Anomaly detection
+     - Alert generation
+
+This architecture provides:
+- High availability
+- Scalability
+- Real-time processing
+- Reliable data persistence
+- Flexible search capabilities
+- Future extensibility
+
 ## Phase 1: Core API Development Progress
 
 ### ✅ Step 1: Set up Spring Boot GraphQL Project
 - Spring Boot 3 project with GraphQL, Elasticsearch, WebSockets, and PostgreSQL
 - Basic GraphQL schema and resolvers
+- Implemented GraphQL queries and mutations for log management
 
 ### ✅ Step 2: Implement Log Storage (Elasticsearch + PostgreSQL)
-- Configured Elasticsearch for log storage
-- Defined Log entity and repository using Spring Data Elasticsearch
-- Implemented GraphQL queries to fetch logs with filtering
+- Configured Elasticsearch for log storage and search
+- Implemented PostgreSQL for persistent storage
+- Defined Log entity and repositories using Spring Data
+- Implemented GraphQL queries with advanced filtering capabilities
+- Added metadata support for flexible log attributes
 
-### 🔲 Step 3: Implement Log Streaming (Kafka / Fluentd)
-- Not started yet
+### ✅ Step 3: Implement Log Streaming (Kafka)
+- Configured Kafka for log message streaming
+- Implemented producer service for sending logs to Kafka
+- Implemented consumer service for processing logs and storing in Elasticsearch
+- Added asynchronous log processing pipeline
 
 ### 🔲 Step 4: Implement GraphQL Subscription for Real-time Alerts
-- Not started yet
-
-## Technologies Used
-
-- **Spring Boot 3**: Framework for creating the backend application
-- **Spring GraphQL**: Implementation of GraphQL for Java
-- **Elasticsearch**: For scalable log storage and search
-- **PostgreSQL**: For relational data storage
-- **WebSockets**: For real-time communication and subscription support (upcoming)
+- Basic subscription setup completed
+- Real-time alert filtering by severity
+- WebSocket configuration pending
+- Alert rules engine pending
 
 ## Setup Instructions
 
@@ -34,7 +140,8 @@ This project is a modern log analysis system that allows for efficient storage, 
 - Java 17 or higher
 - Maven
 - PostgreSQL
-- Elasticsearch 7.x (with ML disabled: `xpack.ml.enabled: false`)
+- Elasticsearch 8.x
+- Apache Kafka & Zookeeper
 
 ### Database Setup
 
@@ -43,13 +150,25 @@ This project is a modern log analysis system that allows for efficient storage, 
 psql -U postgres -f database_setup.sql
 ```
 
-2. Make sure Elasticsearch is running:
+2. Start Elasticsearch:
 ```bash
 # Check Elasticsearch status
 curl http://localhost:9200
+```
 
-# If not running, start Elasticsearch
-/opt/homebrew/opt/elasticsearch-full/bin/elasticsearch
+3. Start Zookeeper:
+```bash
+/opt/homebrew/bin/zkServer start-foreground
+```
+
+4. Start Kafka:
+```bash
+/opt/homebrew/opt/kafka/bin/kafka-server-start /opt/homebrew/etc/kafka/server.properties
+```
+
+5. Create Kafka topic:
+```bash
+/opt/homebrew/opt/kafka/bin/kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic log-events
 ```
 
 ### Running the application
@@ -77,7 +196,11 @@ query {
     filter: {
       applications: ["backend-service"],
       severities: [ERROR, CRITICAL],
-      startTime: "2023-04-01T00:00:00Z"
+      startTime: "2023-04-01T00:00:00Z",
+      metadata: {
+        key: "environment",
+        value: "production"
+      }
     },
     page: {
       page: 0,
@@ -115,31 +238,17 @@ query {
 }
 ```
 
-Find logs by application and severity:
-```graphql
-query {
-  findLogsByApplicationAndSeverity(
-    application: "user-service", 
-    severity: ERROR
-  ) {
-    id
-    timestamp
-    message
-  }
-}
-```
-
 ### Mutations
 
 Ingest a new log:
 ```graphql
 mutation {
   ingestLog(input: {
-    timestamp: "2023-04-15T14:32:21Z",
+    timestamp: "2024-03-17T14:32:21Z",
     application: "user-service",
-    message: "Database connection failed",
-    severity: ERROR,
-    source: "application-server",
+    message: "User authentication successful",
+    severity: INFO,
+    source: "auth-service",
     host: "prod-server-01",
     metadata: [
       { key: "user_id", value: "12345" },
@@ -149,6 +258,26 @@ mutation {
     id
     timestamp
     message
+    severity
+    metadata {
+      key
+      value
+    }
+  }
+}
+```
+
+### Subscriptions (Coming Soon)
+
+Subscribe to log alerts:
+```graphql
+subscription {
+  logAlerts(severity: [ERROR, CRITICAL]) {
+    id
+    timestamp
+    application
+    message
+    severity
   }
 }
 ```
