@@ -249,4 +249,223 @@ curl -X GET "localhost:9200/_cat/indices?v"
 3. Monitor Kafka Consumer Group:
 ```bash
 /opt/homebrew/opt/kafka/bin/kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group log-analyzer-group
-``` 
+```
+
+## 6. Service Restart Testing
+
+### 6.1 Pre-Restart Data Population
+
+1. Add test logs with different timestamps:
+```graphql
+mutation {
+  ingestLog(input: {
+    timestamp: "2024-03-17T12:00:00Z",
+    application: "restart-test",
+    message: "Pre-restart test log",
+    severity: INFO,
+    metadata: [
+      { key: "test_type", value: "restart" },
+      { key: "phase", value: "pre-restart" }
+    ]
+  }) {
+    id
+  }
+}
+```
+
+2. Verify data is stored:
+```graphql
+query {
+  logs(
+    filter: {
+      applications: ["restart-test"]
+    }
+  ) {
+    content {
+      id
+      message
+      metadata {
+        key
+        value
+      }
+    }
+  }
+}
+```
+
+### 6.2 Service Shutdown Testing
+
+Follow this sequence and verify each step:
+
+1. **Spring Boot Application**:
+   - Stop with Ctrl+C
+   - Verify app logs show clean shutdown
+   - Check for any error messages
+
+2. **Kafka**:
+   ```bash
+   # Stop Kafka
+   /opt/homebrew/bin/kafka-server-stop
+   
+   # Verify Kafka is stopped
+   ps aux | grep kafka
+   ```
+
+3. **Zookeeper**:
+   ```bash
+   # Stop Zookeeper
+   /opt/homebrew/bin/zkServer stop
+   
+   # Verify Zookeeper is stopped
+   ps aux | grep zookeeper
+   ```
+
+4. **Elasticsearch**:
+   ```bash
+   # Stop Elasticsearch
+   brew services stop elasticsearch
+   
+   # Verify Elasticsearch is stopped
+   curl -X GET "localhost:9200/_cluster/health"
+   # Should fail to connect
+   ```
+
+### 6.3 Service Startup Testing
+
+1. **Start Elasticsearch**:
+   ```bash
+   brew services start elasticsearch
+   
+   # Wait 15 seconds, then verify
+   curl -X GET "localhost:9200/_cluster/health"
+   # Should show "status": "green"
+   ```
+
+2. **Start Zookeeper**:
+   ```bash
+   # Clear data if needed
+   rm -rf /opt/homebrew/var/run/zookeeper/data/*
+   
+   # Start Zookeeper
+   /opt/homebrew/bin/zkServer start-foreground
+   
+   # Verify in another terminal
+   echo "ruok" | nc localhost 2181
+   # Should return "imok"
+   ```
+
+3. **Start Kafka**:
+   ```bash
+   /opt/homebrew/opt/kafka/bin/kafka-server-start /opt/homebrew/etc/kafka/server.properties
+   
+   # Verify topic exists
+   /opt/homebrew/opt/kafka/bin/kafka-topics --describe --topic log-events --bootstrap-server localhost:9092
+   ```
+
+4. **Start Spring Boot Application**:
+   ```bash
+   mvn spring-boot:run
+   ```
+
+### 6.4 Post-Restart Data Verification
+
+1. Verify pre-restart data is accessible:
+```graphql
+query {
+  logs(
+    filter: {
+      metadata: {
+        key: "test_type",
+        value: "restart"
+      }
+    }
+  ) {
+    content {
+      id
+      message
+      metadata {
+        key
+        value
+      }
+    }
+  }
+}
+```
+
+2. Add new test log:
+```graphql
+mutation {
+  ingestLog(input: {
+    timestamp: "2024-03-17T14:00:00Z",
+    application: "restart-test",
+    message: "Post-restart test log",
+    severity: INFO,
+    metadata: [
+      { key: "test_type", value: "restart" },
+      { key: "phase", value: "post-restart" }
+    ]
+  }) {
+    id
+  }
+}
+```
+
+3. Verify both pre and post-restart data:
+```graphql
+query {
+  logs(
+    filter: {
+      applications: ["restart-test"]
+    }
+  ) {
+    content {
+      id
+      message
+      metadata {
+        key
+        value
+      }
+    }
+    totalElements
+  }
+}
+```
+
+### 6.5 Troubleshooting Failed Restarts
+
+1. **Zookeeper Connection Issues**:
+   ```bash
+   # Clear Zookeeper data
+   rm -rf /opt/homebrew/var/run/zookeeper/data/*
+   
+   # Kill any lingering processes
+   pkill -f zookeeper
+   pkill -f kafka
+   
+   # Restart in correct order
+   /opt/homebrew/bin/zkServer start-foreground
+   # Wait for success message
+   ```
+
+2. **Kafka Connection Issues**:
+   ```bash
+   # Check Zookeeper first
+   echo "ruok" | nc localhost 2181
+   
+   # Clear Kafka logs if needed
+   rm -rf /opt/homebrew/var/lib/kafka-logs/*
+   
+   # Restart Kafka
+   /opt/homebrew/opt/kafka/bin/kafka-server-start /opt/homebrew/etc/kafka/server.properties
+   ```
+
+3. **Elasticsearch Issues**:
+   ```bash
+   # Check cluster health
+   curl -X GET "localhost:9200/_cluster/health"
+   
+   # List indices
+   curl -X GET "localhost:9200/_cat/indices?v"
+   ```
+
+Remember to always check application logs for specific error messages when troubleshooting restart issues. 
