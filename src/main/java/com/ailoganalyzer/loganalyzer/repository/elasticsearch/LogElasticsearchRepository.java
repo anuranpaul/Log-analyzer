@@ -1,4 +1,4 @@
-package com.ailoganalyzer.loganalyzer.repository;
+package com.ailoganalyzer.loganalyzer.repository.elasticsearch;
 
 import com.ailoganalyzer.loganalyzer.model.Log;
 import com.ailoganalyzer.loganalyzer.model.Severity;
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.List;
 
-@Repository
+@Repository("elasticsearchLogRepository")
 public interface LogElasticsearchRepository extends ElasticsearchRepository<Log, Long> {
     
     // Find logs by application

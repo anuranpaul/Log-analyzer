@@ -2,9 +2,10 @@ package com.ailoganalyzer.loganalyzer.service;
 
 import com.ailoganalyzer.loganalyzer.model.Log;
 import com.ailoganalyzer.loganalyzer.model.Severity;
-import com.ailoganalyzer.loganalyzer.repository.LogElasticsearchRepository;
-import com.ailoganalyzer.loganalyzer.repository.LogRepository;
+import com.ailoganalyzer.loganalyzer.repository.elasticsearch.LogElasticsearchRepository;
+import com.ailoganalyzer.loganalyzer.repository.jpa.LogJpaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
@@ -12,6 +13,8 @@ import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.Criteria;
+import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -35,8 +38,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LogService {
 
-    private final LogRepository logRepository;
+    @Qualifier("jpaLogRepository")
+    private final LogJpaRepository logRepository;
+    
+    @Qualifier("elasticsearchLogRepository")
     private final LogElasticsearchRepository logElasticsearchRepository;
+    
     private final ElasticsearchOperations elasticsearchOperations;
 
     @Transactional
