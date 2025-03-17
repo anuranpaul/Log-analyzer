@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.List;
 
-@Repository("elasticsearchLogRepository")
+@Repository("logElasticsearchRepository")
 public interface LogElasticsearchRepository extends ElasticsearchRepository<Log, Long> {
     
     // Find logs by application

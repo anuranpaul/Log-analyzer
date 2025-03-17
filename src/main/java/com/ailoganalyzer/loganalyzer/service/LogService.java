@@ -4,6 +4,7 @@ import com.ailoganalyzer.loganalyzer.model.Log;
 import com.ailoganalyzer.loganalyzer.model.Severity;
 import com.ailoganalyzer.loganalyzer.repository.elasticsearch.LogElasticsearchRepository;
 import com.ailoganalyzer.loganalyzer.repository.jpa.LogJpaRepository;
+import com.ailoganalyzer.loganalyzer.service.KafkaProducerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Page;
@@ -38,21 +39,23 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LogService {
 
-    @Qualifier("jpaLogRepository")
+    @Qualifier("logJpaRepository")
     private final LogJpaRepository logRepository;
     
-    @Qualifier("elasticsearchLogRepository")
+    @Qualifier("logElasticsearchRepository")
     private final LogElasticsearchRepository logElasticsearchRepository;
     
     private final ElasticsearchOperations elasticsearchOperations;
+    
+    private final KafkaProducerService kafkaProducerService;
 
     @Transactional
     public Log saveLog(Log log) {
         // Save to PostgreSQL first to get the ID
         Log savedLog = logRepository.save(log);
         
-        // Then save to Elasticsearch
-        logElasticsearchRepository.save(savedLog);
+        // Send to Kafka for async processing
+        kafkaProducerService.sendLog(savedLog);
         
         return savedLog;
     }
