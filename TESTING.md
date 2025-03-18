@@ -510,3 +510,84 @@ query {
    ```
 
 Remember to always check application logs for specific error messages when troubleshooting restart issues. 
+
+## 7. Health Monitoring Testing
+
+### 7.1 Testing the Health Dashboard
+
+1. Access the health dashboard:
+   ```
+   http://localhost:8080/system-health
+   ```
+
+2. Verify the following components are displayed:
+   - Overall system health status
+   - Database health status
+   - Elasticsearch health status
+   - Kafka health status
+   - Zookeeper health status
+
+3. Test the refresh button:
+   - Click the "Refresh" button
+   - Verify the timestamp updates
+   - Verify all health statuses refresh
+
+### 7.2 Testing Component Health Status
+
+1. Test with all services running:
+   - All health indicators should show "UP" status
+   - Overall status should be "UP"
+
+2. Test with individual services down:
+   - Stop Elasticsearch:
+     ```bash
+     brew services stop elasticsearch
+     ```
+   - Refresh the health dashboard
+   - Elasticsearch status should show "DOWN"
+   - Overall status should show "DOWN"
+   - Restart Elasticsearch:
+     ```bash
+     brew services start elasticsearch
+     ```
+   - Wait for service to start (~15 seconds)
+   - Refresh dashboard and verify status returns to "UP"
+
+3. Repeat for other services:
+   - Test Kafka health by stopping/starting the Kafka broker
+   - Test Zookeeper health by stopping/starting the Zookeeper service
+   - Test Database health by temporarily changing the database credentials in application.properties
+
+### 7.3 Testing the Health API
+
+1. Access the health API endpoint:
+   ```bash
+   curl -X GET "http://localhost:8080/api/health"
+   ```
+
+2. Verify the JSON response includes:
+   - Overall status
+   - Status for each component
+   - Details for each component
+
+3. Access specific health components (if applicable):
+   ```bash
+   curl -X GET "http://localhost:8080/actuator/health/elasticsearch"
+   curl -X GET "http://localhost:8080/actuator/health/db"
+   curl -X GET "http://localhost:8080/actuator/health/kafka"
+   ```
+
+### 7.4 Troubleshooting Health Monitoring
+
+1. If health indicators show "DOWN" status:
+   - Check the component's health details for specific error messages
+   - Verify the component is actually running
+   - Check network connectivity if applicable
+   - Review application logs for more detailed error information
+
+2. Common health monitoring issues:
+   - Incorrect connection strings or credentials
+   - Network connectivity problems
+   - Resource limitations (memory, disk space)
+   - Permission issues with external services
+   - Configuration problems in application.properties 

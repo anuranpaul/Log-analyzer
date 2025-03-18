@@ -319,3 +319,43 @@ This page allows you to:
 - Subscribe to all logs or filter by severity
 - Send test logs with different severity levels
 - View real-time log alerts as they arrive
+
+## Health Monitoring
+
+The application includes comprehensive health monitoring for all system components, providing real-time status information to ensure reliability and assist in troubleshooting.
+
+### Health Dashboard
+
+A visual health dashboard is available at:
+
+```
+http://localhost:8080/system-health
+```
+
+This dashboard displays:
+- Overall system health status
+- Individual component health status (PostgreSQL, Elasticsearch, Kafka, Zookeeper)
+- Real-time updates with automatic refresh
+
+### Health API
+
+Health data is also available programmatically via REST:
+
+```
+http://localhost:8080/api/health
+```
+
+This endpoint returns a JSON representation of all health indicators, including:
+- Overall system status
+- Component-specific status
+- Detailed health information for each component
+
+### Health Indicators
+
+The application monitors the following components:
+- **Database**: Checks PostgreSQL connectivity and response time
+- **Elasticsearch**: Verifies index existence and cluster health
+- **Kafka**: Validates broker availability and topics
+- **Zookeeper**: Confirms service availability and connection state
+
+These health checks help identify issues early and assist with diagnosing problems during deployment and operation.
