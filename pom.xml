@@ -113,6 +113,12 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        
+        <!-- Add Thymeleaf for HTML templates -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
 
     </dependencies>
 

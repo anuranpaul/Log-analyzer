@@ -350,6 +350,13 @@ This endpoint returns a JSON representation of all health indicators, including:
 - Component-specific status
 - Detailed health information for each component
 
+Note: You can also access individual health components via the Actuator endpoints:
+```
+http://localhost:8080/actuator/health/elasticsearch
+http://localhost:8080/actuator/health/db
+http://localhost:8080/actuator/health/kafka
+```
+
 ### Health Indicators
 
 The application monitors the following components:

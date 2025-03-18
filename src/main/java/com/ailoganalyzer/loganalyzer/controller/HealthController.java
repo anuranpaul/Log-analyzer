@@ -42,6 +42,11 @@ public class HealthController {
         return "health-dashboard";
     }
     
+    @GetMapping("/api/system-health")
+    public String redirectToHealthDashboard() {
+        return "redirect:/system-health";
+    }
+    
     @GetMapping(value = "/api/health", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> healthJson() {
