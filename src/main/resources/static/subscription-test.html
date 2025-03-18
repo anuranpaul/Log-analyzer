@@ -49,6 +49,15 @@
             padding: 10px;
             border-radius: 4px;
         }
+        #debugInfo {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -58,6 +67,7 @@
         
         <div>
             <button id="connect">Connect to Subscription</button>
+            <button id="reconnect">Reconnect</button>
             <button id="disconnect">Disconnect</button>
             <button id="create-log">Create Test Log</button>
             <button id="clear-logs">Clear Log Display</button>
@@ -68,17 +78,29 @@
         
         <h2>Connection Status</h2>
         <pre id="status">Disconnected</pre>
+        
+        <h2>Debug Information</h2>
+        <div id="debugInfo"></div>
     </div>
 
     <script>
         let socket;
         const logsDiv = document.getElementById('logs');
         const statusPre = document.getElementById('status');
+        const debugDiv = document.getElementById('debugInfo');
         
         document.getElementById('connect').addEventListener('click', connect);
+        document.getElementById('reconnect').addEventListener('click', reconnect);
         document.getElementById('disconnect').addEventListener('click', disconnect);
         document.getElementById('create-log').addEventListener('click', createLog);
         document.getElementById('clear-logs').addEventListener('click', clearLogs);
+        
+        function reconnect() {
+            disconnect();
+            setTimeout(() => {
+                connect();
+            }, 500);
+        }
         
         // WebSocket connection handler
         function connect() {
@@ -127,14 +149,20 @@
             
             socket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                updateStatus('Received message: ' + event.data);
+                updateDebugInfo('Received message: ' + event.data);
                 
                 if (data.type === 'connection_ack') {
-                    updateStatus('Connection acknowledged');
+                    updateStatus('Connected (Acknowledged)');
                 }
                 else if (data.type === 'next' && data.payload && data.payload.data && data.payload.data.allLogAlerts) {
-                    // Display the received log alert
+                    // Filter out the warmup message
                     const log = data.payload.data.allLogAlerts;
+                    if (log.id === 'warmup') {
+                        updateDebugInfo('Received warmup message (ignored)');
+                        return;
+                    }
+                    
+                    // Display the received log alert
                     addLogToDisplay(log);
                 }
             };
@@ -158,6 +186,10 @@
         function createLog() {
             // Create a test log entry using the ingestLog mutation
             const timestamp = new Date().toISOString();
+            const severities = ['INFO', 'WARNING', 'ERROR', 'CRITICAL'];
+            const severity = severities[Math.floor(Math.random() * severities.length)];
+            
+            updateDebugInfo(`Creating test log with severity: ${severity}`);
             
             fetch('http://localhost:8080/graphql', {
                 method: 'POST',
@@ -171,7 +203,7 @@
                                 timestamp: "${timestamp}",
                                 application: "Test App",
                                 message: "Test alert message at ${timestamp}",
-                                severity: ERROR,
+                                severity: ${severity},
                                 source: "subscription-test",
                                 host: "localhost",
                                 metadata: [
@@ -190,15 +222,15 @@
             .then(response => response.json())
             .then(result => {
                 if (result.data && result.data.ingestLog) {
-                    updateStatus('Created log: ' + JSON.stringify(result.data.ingestLog));
+                    updateDebugInfo('Created log: ' + JSON.stringify(result.data.ingestLog));
                 } else if (result.errors) {
-                    updateStatus('Error creating log: ' + JSON.stringify(result.errors));
+                    updateDebugInfo('Error creating log: ' + JSON.stringify(result.errors));
                 } else {
-                    updateStatus('Unknown response: ' + JSON.stringify(result));
+                    updateDebugInfo('Unknown response: ' + JSON.stringify(result));
                 }
             })
             .catch(error => {
-                updateStatus('Error creating log: ' + error);
+                updateDebugInfo('Error creating log: ' + error);
             });
         }
         
@@ -230,10 +262,27 @@
         }
         
         function updateStatus(message) {
-            const timestamp = new Date().toLocaleTimeString();
-            statusPre.textContent += `\n[${timestamp}] ${message}`;
-            statusPre.scrollTop = statusPre.scrollHeight;
+            statusPre.textContent = message;
         }
+        
+        function updateDebugInfo(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const p = document.createElement('p');
+            p.textContent = `[${timestamp}] ${message}`;
+            p.style.margin = "2px 0";
+            debugDiv.appendChild(p);
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+            
+            // Keep only the last 20 debug messages
+            while (debugDiv.children.length > 20) {
+                debugDiv.removeChild(debugDiv.firstChild);
+            }
+        }
+        
+        // Connect on page load
+        window.onload = function() {
+            connect();
+        };
     </script>
 </body>
 </html> 

@@ -87,6 +87,7 @@
             <button onclick="sendTestLog('WARNING')">Send WARNING Log</button>
             <button onclick="sendTestLog('ERROR')">Send ERROR Log</button>
             <button onclick="sendTestLog('CRITICAL')">Send CRITICAL Log</button>
+            <button onclick="clearLogs()">Clear Logs</button>
         </div>
         
         <h3>Subscription Status: <span id="status">Disconnected</span></h3>
@@ -114,6 +115,7 @@ subscription {
         
         <h3>Debug Information</h3>
         <div id="debugInfo"></div>
+        <button onclick="clearDebugInfo()">Clear Debug Info</button>
     </div>
 
     <script>
@@ -138,6 +140,16 @@ subscription {
             while (debugDiv.children.length > 20) {
                 debugDiv.removeChild(debugDiv.firstChild);
             }
+        }
+        
+        function clearDebugInfo() {
+            document.getElementById('debugInfo').innerHTML = '';
+            addDebugInfo('Debug information cleared');
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            addDebugInfo('Logs display cleared');
         }
         
         function addLogEntry(log) {
