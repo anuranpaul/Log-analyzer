@@ -12,14 +12,14 @@
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             background-color: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             padding: 20px;
         }
-        h1, h2 {
+        h1, h2, h3 {
             color: #333;
         }
         .header {
@@ -81,6 +81,52 @@
             color: #6c757d;
             margin-top: 15px;
         }
+        .details-section {
+            margin-top: 30px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .metric-card {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .metric-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #28a745;
+            border-radius: 5px;
+        }
+        .progress-fill.warning {
+            background-color: #ffc107;
+        }
+        .progress-fill.danger {
+            background-color: #dc3545;
+        }
+        .metrics-heading {
+            margin-top: 0;
+        }
+        .metric-details {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -102,9 +148,130 @@
             </div>
         </div>
 
+        <div class="details-section">
+            <h2 class="metrics-heading">Detailed Metrics</h2>
+            
+            <!-- Disk Space Section -->
+            <div class="metric-card">
+                <div class="metric-title">Disk Space</div>
+                <div id="disk-space-container">
+                    <div class="metric-value"><span id="diskFreeSpace">Loading...</span></div>
+                    <div class="progress-bar">
+                        <div id="diskSpaceBar" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-details">
+                        Free: <span id="diskFreeValue">-</span> / Total: <span id="diskTotalValue">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Memory Usage Section -->
+            <div class="metric-card">
+                <div class="metric-title">Memory Usage</div>
+                <div id="memory-container">
+                    <div class="metric-value"><span id="memoryUsed">Loading...</span></div>
+                    <div class="progress-bar">
+                        <div id="memoryBar" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-details">
+                        Used: <span id="memoryUsedValue">-</span> / Max: <span id="memoryMaxValue">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="last-updated">
             Last updated: <span th:text="${#dates.format(new java.util.Date(), 'dd-MM-yyyy HH:mm:ss')}">01-01-2023 00:00:00</span>
         </div>
     </div>
+
+    <script>
+        // Fetch health data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchHealthData();
+        });
+
+        function fetchHealthData() {
+            fetch('/api/health')
+                .then(response => response.json())
+                .then(data => {
+                    updateDiskSpaceMetrics(data);
+                    updateMemoryMetrics(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching health data:', error);
+                });
+        }
+
+        function updateDiskSpaceMetrics(data) {
+            const diskSpaceComponent = data.components.diskSpace;
+            if (diskSpaceComponent && diskSpaceComponent.details) {
+                const details = diskSpaceComponent.details;
+                const total = details.total;
+                const free = details.free;
+                const threshold = details.threshold;
+                
+                const usedPercentage = Math.round(((total - free) / total) * 100);
+                
+                document.getElementById('diskFreeSpace').textContent = `${usedPercentage}% Used`;
+                document.getElementById('diskFreeValue').textContent = formatBytes(free);
+                document.getElementById('diskTotalValue').textContent = formatBytes(total);
+                
+                const diskSpaceBar = document.getElementById('diskSpaceBar');
+                diskSpaceBar.style.width = `${usedPercentage}%`;
+                
+                if (usedPercentage > 90) {
+                    diskSpaceBar.classList.add('danger');
+                } else if (usedPercentage > 70) {
+                    diskSpaceBar.classList.add('warning');
+                }
+            }
+        }
+
+        function updateMemoryMetrics(data) {
+            // Try to get memory data from different possible sources
+            const metrics = data.components.memory || data.components.jvm;
+            
+            if (metrics && metrics.details) {
+                let used, max;
+                
+                // Handle different response formats
+                if (metrics.details.used && metrics.details.max) {
+                    used = metrics.details.used;
+                    max = metrics.details.max;
+                } else if (metrics.details.mem) {
+                    used = metrics.details.mem.used;
+                    max = metrics.details.mem.max;
+                }
+                
+                if (used !== undefined && max !== undefined) {
+                    const usedPercentage = Math.round((used / max) * 100);
+                    
+                    document.getElementById('memoryUsed').textContent = `${usedPercentage}% Used`;
+                    document.getElementById('memoryUsedValue').textContent = formatBytes(used);
+                    document.getElementById('memoryMaxValue').textContent = formatBytes(max);
+                    
+                    const memoryBar = document.getElementById('memoryBar');
+                    memoryBar.style.width = `${usedPercentage}%`;
+                    
+                    if (usedPercentage > 90) {
+                        memoryBar.classList.add('danger');
+                    } else if (usedPercentage > 70) {
+                        memoryBar.classList.add('warning');
+                    }
+                }
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
 </body>
 </html> 
