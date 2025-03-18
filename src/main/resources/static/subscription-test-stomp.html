@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Subscription Test (STOMP)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #logs {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .log-info {
+            background-color: #e3f2fd;
+        }
+        .log-warning {
+            background-color: #fff9c4;
+        }
+        .log-error, .log-critical {
+            background-color: #ffebee;
+        }
+        .log-debug {
+            background-color: #e8f5e9;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Log Subscription Test (STOMP)</h1>
+        
+        <div>
+            <h3>Severity Filter</h3>
+            <button onclick="subscribeToAll()">All Logs</button>
+            <button onclick="subscribeToSeverity('INFO')">INFO Only</button>
+            <button onclick="subscribeToSeverity('WARNING')">WARNING Only</button>
+            <button onclick="subscribeToSeverity('ERROR')">ERROR Only</button>
+            <button onclick="subscribeToSeverity('CRITICAL')">CRITICAL Only</button>
+            <button onclick="unsubscribe()">Unsubscribe</button>
+        </div>
+        
+        <div>
+            <h3>Send Test Log</h3>
+            <button onclick="sendTestLog('INFO')">Send INFO Log</button>
+            <button onclick="sendTestLog('WARNING')">Send WARNING Log</button>
+            <button onclick="sendTestLog('ERROR')">Send ERROR Log</button>
+            <button onclick="sendTestLog('CRITICAL')">Send CRITICAL Log</button>
+        </div>
+        
+        <h3>Connection Status: <span id="status">Disconnected</span></h3>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let subscriptions = [];
+        
+        function updateStatus(status) {
+            document.getElementById('status').textContent = status;
+        }
+        
+        function addLogEntry(log) {
+            const logsDiv = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${log.severity.toLowerCase()}`;
+            
+            const timestamp = new Date(log.timestamp).toLocaleString();
+            
+            logEntry.innerHTML = `
+                <strong>${timestamp} - ${log.severity} [${log.application}]:</strong> ${log.message}
+                <br>
+                <small>Source: ${log.source || 'N/A'}, Host: ${log.host || 'N/A'}, ID: ${log.id}</small>
+                ${log.metadata && log.metadata.length > 0 ? 
+                    `<br><small>Metadata: ${log.metadata.map(m => `${m.key}=${m.value}`).join(', ')}</small>` : ''}
+            `;
+            
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        function connect() {
+            if (stompClient !== null && stompClient.connected) {
+                return;
+            }
+            
+            const socket = new SockJS('/graphql-ws');
+            stompClient = Stomp.over(socket);
+            
+            // Disable debug logging
+            stompClient.debug = null;
+            
+            stompClient.connect({}, function(frame) {
+                updateStatus('Connected');
+                console.log('Connected: ' + frame);
+            }, function(error) {
+                console.error('STOMP error:', error);
+                updateStatus('Error: ' + error);
+                setTimeout(connect, 5000);
+            });
+        }
+        
+        function disconnect() {
+            if (stompClient !== null) {
+                unsubscribe();
+                stompClient.disconnect();
+                stompClient = null;
+                updateStatus('Disconnected');
+            }
+        }
+        
+        function subscribeToAll() {
+            connect();
+            
+            if (!stompClient || !stompClient.connected) {
+                console.error('Not connected!');
+                return;
+            }
+            
+            unsubscribe();
+            
+            const subscription = stompClient.subscribe('/topic/logs/all', function(message) {
+                const log = JSON.parse(message.body);
+                addLogEntry(log);
+            });
+            
+            subscriptions.push(subscription);
+            updateStatus('Subscribed to all logs');
+        }
+        
+        function subscribeToSeverity(severity) {
+            connect();
+            
+            if (!stompClient || !stompClient.connected) {
+                console.error('Not connected!');
+                return;
+            }
+            
+            unsubscribe();
+            
+            const subscription = stompClient.subscribe('/topic/logs/severity/' + severity, function(message) {
+                const log = JSON.parse(message.body);
+                addLogEntry(log);
+            });
+            
+            subscriptions.push(subscription);
+            updateStatus('Subscribed to ' + severity + ' logs');
+        }
+        
+        function unsubscribe() {
+            while (subscriptions.length > 0) {
+                const subscription = subscriptions.pop();
+                subscription.unsubscribe();
+            }
+            
+            if (stompClient && stompClient.connected) {
+                updateStatus('Connected (no subscriptions)');
+            }
+        }
+        
+        function sendTestLog(severity) {
+            const timestamp = new Date().toISOString();
+            const application = 'test-app';
+            const message = `Test ${severity} log message at ${new Date().toLocaleString()}`;
+            
+            fetch('/graphql', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: `
+                        mutation {
+                            ingestLog(input: {
+                                timestamp: "${timestamp}",
+                                application: "${application}",
+                                message: "${message}",
+                                severity: ${severity},
+                                source: "subscription-test",
+                                host: "local-browser",
+                                metadata: [
+                                    {key: "test", value: "true"},
+                                    {key: "browser", value: "${navigator.userAgent.split(' ')[0]}"}
+                                ]
+                            }) {
+                                id
+                            }
+                        }
+                    `
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Log sent:', data);
+            })
+            .catch(error => {
+                console.error('Error sending log:', error);
+            });
+        }
+        
+        // Connect on page load
+        window.onload = function() {
+            connect();
+        };
+        
+        // Disconnect when page is closed
+        window.onbeforeunload = function() {
+            disconnect();
+        };
+    </script>
+</body>
+</html> 

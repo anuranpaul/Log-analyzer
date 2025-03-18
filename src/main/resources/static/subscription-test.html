@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Log Analyzer - Subscription Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        #logs {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 15px;
+            min-height: 300px;
+            background-color: #f9f9f9;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #4CAF50;
+            background-color: #fff;
+        }
+        .error { border-left-color: #f44336; }
+        .warning { border-left-color: #ff9800; }
+        .info { border-left-color: #2196F3; }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        h1 {
+            color: #333;
+        }
+        pre {
+            white-space: pre-wrap;
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GraphQL Subscription Test</h1>
+        <p>This page tests the GraphQL subscription for real-time log alerts.</p>
+        
+        <div>
+            <button id="connect">Connect to Subscription</button>
+            <button id="disconnect">Disconnect</button>
+            <button id="create-log">Create Test Log</button>
+            <button id="clear-logs">Clear Log Display</button>
+        </div>
+        
+        <h2>Log Alerts</h2>
+        <div id="logs"></div>
+        
+        <h2>Connection Status</h2>
+        <pre id="status">Disconnected</pre>
+    </div>
+
+    <script>
+        let socket;
+        const logsDiv = document.getElementById('logs');
+        const statusPre = document.getElementById('status');
+        
+        document.getElementById('connect').addEventListener('click', connect);
+        document.getElementById('disconnect').addEventListener('click', disconnect);
+        document.getElementById('create-log').addEventListener('click', createLog);
+        document.getElementById('clear-logs').addEventListener('click', clearLogs);
+        
+        // WebSocket connection handler
+        function connect() {
+            // Close any existing connection
+            if (socket) {
+                socket.close();
+            }
+            
+            // Connect to the GraphQL WebSocket endpoint
+            socket = new WebSocket('ws://localhost:8080/graphql-ws');
+            
+            socket.onopen = function() {
+                updateStatus('Connected to WebSocket');
+                
+                // Initialize connection with GraphQL subscription protocol
+                socket.send(JSON.stringify({
+                    type: 'connection_init'
+                }));
+                
+                // After a short delay, send the subscription request
+                setTimeout(() => {
+                    socket.send(JSON.stringify({
+                        id: '1',
+                        type: 'subscribe',
+                        payload: {
+                            query: `
+                                subscription {
+                                    allLogAlerts {
+                                        id
+                                        application
+                                        message
+                                        severity
+                                        timestamp
+                                        metadata {
+                                          key
+                                          value
+                                        }
+                                    }
+                                }
+                            `
+                        }
+                    }));
+                    updateStatus('Subscription request sent');
+                }, 1000);
+            };
+            
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateStatus('Received message: ' + event.data);
+                
+                if (data.type === 'connection_ack') {
+                    updateStatus('Connection acknowledged');
+                }
+                else if (data.type === 'next' && data.payload && data.payload.data && data.payload.data.allLogAlerts) {
+                    // Display the received log alert
+                    const log = data.payload.data.allLogAlerts;
+                    addLogToDisplay(log);
+                }
+            };
+            
+            socket.onclose = function() {
+                updateStatus('Disconnected from WebSocket');
+            };
+            
+            socket.onerror = function(error) {
+                updateStatus('Error: ' + JSON.stringify(error));
+            };
+        }
+        
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        }
+        
+        function createLog() {
+            // Create a test log entry using the ingestLog mutation
+            const timestamp = new Date().toISOString();
+            
+            fetch('http://localhost:8080/graphql', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: `
+                        mutation {
+                            ingestLog(input: {
+                                timestamp: "${timestamp}",
+                                application: "Test App",
+                                message: "Test alert message at ${timestamp}",
+                                severity: ERROR,
+                                source: "subscription-test",
+                                host: "localhost",
+                                metadata: [
+                                    {key: "test", value: "data"},
+                                    {key: "alert", value: "true"}
+                                ]
+                            }) {
+                                id
+                                message
+                                severity
+                            }
+                        }
+                    `
+                }),
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.data && result.data.ingestLog) {
+                    updateStatus('Created log: ' + JSON.stringify(result.data.ingestLog));
+                } else if (result.errors) {
+                    updateStatus('Error creating log: ' + JSON.stringify(result.errors));
+                } else {
+                    updateStatus('Unknown response: ' + JSON.stringify(result));
+                }
+            })
+            .catch(error => {
+                updateStatus('Error creating log: ' + error);
+            });
+        }
+        
+        function addLogToDisplay(log) {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${log.severity.toLowerCase()}`;
+            
+            const timestamp = new Date(log.timestamp).toLocaleString();
+            let metadataText = 'None';
+            
+            if (log.metadata && log.metadata.length > 0) {
+                metadataText = log.metadata.map(m => `${m.key}: ${m.value}`).join(', ');
+            }
+            
+            logEntry.innerHTML = `
+                <strong>ID:</strong> ${log.id} | 
+                <strong>Time:</strong> ${timestamp} | 
+                <strong>App:</strong> ${log.application} | 
+                <strong>Severity:</strong> ${log.severity}<br>
+                <strong>Message:</strong> ${log.message}<br>
+                <strong>Metadata:</strong> ${metadataText}
+            `;
+            
+            logsDiv.insertBefore(logEntry, logsDiv.firstChild);
+        }
+        
+        function clearLogs() {
+            logsDiv.innerHTML = '';
+        }
+        
+        function updateStatus(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            statusPre.textContent += `\n[${timestamp}] ${message}`;
+            statusPre.scrollTop = statusPre.scrollHeight;
+        }
+    </script>
+</body>
+</html> 

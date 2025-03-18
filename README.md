@@ -65,16 +65,16 @@ This project is a modern log analysis system that allows for efficient storage, 
   - Handling leader election for Kafka partitions
   - Providing distributed synchronization
 
-### Real-time Communication (Upcoming)
+### Real-time Communication
 
 #### WebSockets
 - **Purpose**: Enable real-time log alerts and monitoring
-- **Planned usage**:
+- **Usage in our system**:
   - Supporting GraphQL subscriptions
   - Real-time log event notifications
   - Live dashboard updates
-  - Instant alert delivery
-  - Bi-directional communication for interactive features
+  - Instant alert delivery for critical logs
+  - Filtered log streams by severity and application
 
 ## System Architecture
 
@@ -85,11 +85,12 @@ Our log analyzer implements a modern event-driven architecture:
    - Stored in PostgreSQL for persistence
    - Published to Kafka for async processing
    - Consumed and indexed in Elasticsearch
+   - Broadcast to WebSocket subscribers in real-time
 
 2. **Query Flow**:
    - Simple queries served directly from PostgreSQL
    - Complex search queries routed to Elasticsearch
-   - Real-time alerts handled via WebSocket subscriptions
+   - Real-time alerts delivered via WebSocket subscriptions
 
 3. **Processing Flow**:
    - Kafka ensures reliable message processing
@@ -281,3 +282,40 @@ subscription {
   }
 }
 ```
+
+### Real-time Log Alerts with Subscriptions
+
+Subscribe to log alerts with optional severity filtering:
+
+```graphql
+subscription {
+  logAlerts(severity: [ERROR, CRITICAL]) {
+    id
+    timestamp
+    application
+    message
+    severity
+    source
+    host
+    metadata {
+      key
+      value
+    }
+  }
+}
+```
+
+This subscription will push new logs in real-time whenever they match the specified severity levels.
+
+### Testing WebSocket Subscriptions
+
+A simple test client is available at:
+
+```
+http://localhost:8080/subscription-test
+```
+
+This page allows you to:
+- Subscribe to all logs or filter by severity
+- Send test logs with different severity levels
+- View real-time log alerts as they arrive

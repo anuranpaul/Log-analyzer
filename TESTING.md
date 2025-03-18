@@ -217,39 +217,80 @@ query {
 }
 ```
 
-## 5. Troubleshooting
+## 5. WebSocket Subscription Testing
 
-### Common Issues and Solutions
+### 5.1 Test WebSocket Subscriptions Using the Test Client
 
-1. Kafka Connection Issues:
-   - Verify Zookeeper is running: `lsof -i :2181`
-   - Check Kafka logs: `tail -f /opt/homebrew/var/log/kafka/kafka.log`
-   - Restart Kafka if needed
+1. Access the WebSocket test client:
+   ```
+   http://localhost:8080/subscription-test
+   ```
 
-2. Elasticsearch Issues:
-   - Check cluster health: `curl -X GET "localhost:9200/_cluster/health"`
-   - Verify index exists: `curl -X GET "localhost:9200/logs"`
+2. Test connection:
+   - The page should automatically connect to the WebSocket endpoint
+   - The status should change to "Connected" after a moment
+   - If it doesn't connect, check the logs for any errors
 
-3. PostgreSQL Issues:
-   - Check database connection: `psql -U your_user -d loganalyzer -c "\dt"`
-   - Verify log table: `psql -U your_user -d loganalyzer -c "SELECT COUNT(*) FROM logs;"`
+### 5.2 Subscribe to Log Alerts
 
-### Verification Commands
+1. Click the "All Logs" button to subscribe to all logs regardless of severity
+   - The status should update to "Subscribed to all logs"
 
-1. Check Kafka Topic:
-```bash
-/opt/homebrew/opt/kafka/bin/kafka-topics --describe --topic log-events --bootstrap-server localhost:9092
-```
+2. Test severity filtering by clicking on one of the severity buttons:
+   - "INFO Only" - Subscribes to only INFO logs
+   - "WARNING Only" - Subscribes to only WARNING logs
+   - "ERROR Only" - Subscribes to only ERROR logs
+   - "CRITICAL Only" - Subscribes to only CRITICAL logs
 
-2. List Elasticsearch Indices:
-```bash
-curl -X GET "localhost:9200/_cat/indices?v"
-```
+3. Verify subscription behavior:
+   - Clicking "Unsubscribe" should cancel any active subscriptions
+   - The status should update to reflect the current subscription state
 
-3. Monitor Kafka Consumer Group:
-```bash
-/opt/homebrew/opt/kafka/bin/kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group log-analyzer-group
-```
+### 5.3 Testing with Real-time Log Generation
+
+1. Generate test logs by clicking the severity buttons in the "Send Test Log" section:
+   - Each button sends a test log with the corresponding severity level
+   - The log should appear immediately in the log display area if subscribed to that severity
+
+2. Verify filtering:
+   - When subscribed to a specific severity, only logs of that severity should appear
+   - When subscribed to "All Logs", logs of any severity should appear
+
+3. Send a log via GraphQL and check real-time delivery:
+   ```graphql
+   mutation {
+     ingestLog(input: {
+       timestamp: "2024-03-17T15:30:00Z",
+       application: "websocket-test-app",
+       message: "Testing real-time log alerts",
+       severity: CRITICAL,
+       source: "testing-guide",
+       host: "test-client",
+       metadata: [
+         { key: "test_type", value: "websocket" },
+         { key: "realtime", value: "true" }
+       ]
+     }) {
+       id
+     }
+   }
+   ```
+
+   - If subscribed to CRITICAL logs, this log should appear immediately in the WebSocket client
+
+### 5.4 Verify End-to-End Pipeline
+
+1. Send a log via the GraphQL mutation
+2. Verify the log is:
+   - Saved to PostgreSQL (check via GraphQL query)
+   - Processed by Kafka (check consumer groups)
+   - Indexed in Elasticsearch
+   - Delivered to WebSocket subscribers in real-time
+
+3. Test disconnection and reconnection:
+   - Close the test client page and reopen it
+   - Verify it reconnects and can resume subscriptions
+   - Send a new log and verify it's received after reconnection
 
 ## 6. Service Restart Testing
 

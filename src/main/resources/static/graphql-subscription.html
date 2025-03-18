@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphQL Subscription Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #logs {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .log-info {
+            background-color: #e3f2fd;
+        }
+        .log-warning {
+            background-color: #fff9c4;
+        }
+        .log-error, .log-critical {
+            background-color: #ffebee;
+        }
+        .log-debug {
+            background-color: #e8f5e9;
+        }
+        #debugInfo {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GraphQL Subscription Test</h1>
+        
+        <div>
+            <h3>Severity Filter</h3>
+            <button onclick="subscribeToAll()">All Severities</button>
+            <button onclick="subscribeToSeverity(['INFO'])">INFO</button>
+            <button onclick="subscribeToSeverity(['WARNING'])">WARNING</button>
+            <button onclick="subscribeToSeverity(['ERROR', 'CRITICAL'])">ERROR & CRITICAL</button>
+            <button onclick="unsubscribe()">Unsubscribe</button>
+        </div>
+        
+        <div>
+            <h3>Send Test Log</h3>
+            <button onclick="sendTestLog('INFO')">Send INFO Log</button>
+            <button onclick="sendTestLog('WARNING')">Send WARNING Log</button>
+            <button onclick="sendTestLog('ERROR')">Send ERROR Log</button>
+            <button onclick="sendTestLog('CRITICAL')">Send CRITICAL Log</button>
+        </div>
+        
+        <h3>Subscription Status: <span id="status">Disconnected</span></h3>
+        
+        <div id="logs"></div>
+        
+        <h3>Subscription Query</h3>
+        <pre id="query">
+subscription {
+  logAlerts(severity: [INFO, WARNING, ERROR, CRITICAL]) {
+    id
+    timestamp
+    application
+    message
+    severity
+    source
+    host
+    metadata {
+      key
+      value
+    }
+  }
+}
+        </pre>
+        
+        <h3>Debug Information</h3>
+        <div id="debugInfo"></div>
+    </div>
+
+    <script>
+        let socket;
+        let currentSubscription = null;
+        let activeSeverities = null;
+        
+        function updateStatus(status) {
+            document.getElementById('status').textContent = status;
+        }
+        
+        function addDebugInfo(message) {
+            const debugDiv = document.getElementById('debugInfo');
+            const timestamp = new Date().toLocaleTimeString();
+            const p = document.createElement('p');
+            p.textContent = `[${timestamp}] ${message}`;
+            p.style.margin = "2px 0";
+            debugDiv.appendChild(p);
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+            
+            // Keep only the last 20 debug messages
+            while (debugDiv.children.length > 20) {
+                debugDiv.removeChild(debugDiv.firstChild);
+            }
+        }
+        
+        function addLogEntry(log) {
+            const logsDiv = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${log.severity.toLowerCase()}`;
+            
+            const timestamp = new Date(log.timestamp).toLocaleString();
+            
+            // Check if the log severity matches our active filter
+            const severityMatches = !activeSeverities || activeSeverities.includes(log.severity);
+            addDebugInfo(`Received log with severity ${log.severity} - Filter match: ${severityMatches}`);
+            
+            logEntry.innerHTML = `
+                <strong>${timestamp} - ${log.severity} [${log.application}]:</strong> ${log.message}
+                <br>
+                <small>Source: ${log.source || 'N/A'}, Host: ${log.host || 'N/A'}, ID: ${log.id}</small>
+                ${log.metadata && log.metadata.length > 0 ? 
+                    `<br><small>Metadata: ${log.metadata.map(m => `${m.key}=${m.value}`).join(', ')}</small>` : ''}
+            `;
+            
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        function connect() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                return;
+            }
+            
+            const wsUrl = `ws://${window.location.host}/graphql-ws`;
+            socket = new WebSocket(wsUrl);
+            
+            socket.onopen = function() {
+                updateStatus('Connected');
+                addDebugInfo('WebSocket connection opened');
+                
+                // Initialize connection
+                const initMessage = {
+                    type: 'connection_init',
+                    payload: {}
+                };
+                socket.send(JSON.stringify(initMessage));
+            };
+            
+            socket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                addDebugInfo(`Received message type: ${message.type}`);
+                
+                switch(message.type) {
+                    case 'connection_ack':
+                        updateStatus('Connected (Acknowledged)');
+                        break;
+                    
+                    case 'next':
+                        addDebugInfo(`Message payload: ${JSON.stringify(message.payload)}`);
+                        if (message.payload && message.payload.data && message.payload.data.logAlerts) {
+                            addLogEntry(message.payload.data.logAlerts);
+                        }
+                        break;
+                    
+                    case 'error':
+                        console.error('Subscription error:', message.payload);
+                        updateStatus('Error: ' + JSON.stringify(message.payload));
+                        addDebugInfo(`Subscription error: ${JSON.stringify(message.payload)}`);
+                        break;
+                    
+                    case 'complete':
+                        updateStatus('Subscription completed');
+                        addDebugInfo('Subscription completed');
+                        currentSubscription = null;
+                        activeSeverities = null;
+                        break;
+                }
+            };
+            
+            socket.onclose = function() {
+                updateStatus('Disconnected');
+                addDebugInfo('WebSocket connection closed');
+                currentSubscription = null;
+                activeSeverities = null;
+            };
+            
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateStatus('Error (see console)');
+                addDebugInfo(`WebSocket error: ${error}`);
+            };
+        }
+        
+        function subscribe(severities) {
+            connect();
+            
+            // Wait for connection
+            setTimeout(() => {
+                if (socket.readyState !== WebSocket.OPEN) {
+                    updateStatus('Error: Socket not open');
+                    return;
+                }
+                
+                // If already subscribed, unsubscribe first
+                if (currentSubscription) {
+                    unsubscribe();
+                }
+                
+                // Generate a unique subscription ID
+                currentSubscription = 'sub-' + Date.now();
+                activeSeverities = severities;
+                
+                // Build severity filter if provided
+                let severityArg = '';
+                if (severities && severities.length > 0) {
+                    severityArg = `(severity: [${severities.join(', ')}])`;
+                    document.getElementById('query').textContent = 
+                        `subscription {\n  logAlerts${severityArg} {\n    id\n    timestamp\n    application\n    message\n    severity\n    source\n    host\n    metadata {\n      key\n      value\n    }\n  }\n}`;
+                } else {
+                    document.getElementById('query').textContent = 
+                        `subscription {\n  logAlerts {\n    id\n    timestamp\n    application\n    message\n    severity\n    source\n    host\n    metadata {\n      key\n      value\n    }\n  }\n}`;
+                }
+                
+                // Send subscription message
+                const subscriptionMessage = {
+                    id: currentSubscription,
+                    type: 'subscribe',
+                    payload: {
+                        query: `subscription { logAlerts${severityArg} { id timestamp application message severity source host metadata { key value } } }`
+                    }
+                };
+                
+                addDebugInfo(`Subscribing to severities: ${severities ? severities.join(', ') : 'All'}`);
+                socket.send(JSON.stringify(subscriptionMessage));
+                updateStatus(`Subscribed (${severities ? severities.join(', ') : 'All Severities'})`);
+            }, 300);
+        }
+        
+        function subscribeToAll() {
+            subscribe();
+        }
+        
+        function subscribeToSeverity(severities) {
+            subscribe(severities);
+        }
+        
+        function unsubscribe() {
+            if (!currentSubscription || !socket || socket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            const completeMessage = {
+                id: currentSubscription,
+                type: 'complete'
+            };
+            
+            addDebugInfo('Unsubscribing from current subscription');
+            socket.send(JSON.stringify(completeMessage));
+            currentSubscription = null;
+            activeSeverities = null;
+            updateStatus('Unsubscribed');
+        }
+        
+        function sendTestLog(severity) {
+            const timestamp = new Date().toISOString();
+            const application = 'test-app';
+            const message = `Test ${severity} log message at ${new Date().toLocaleString()}`;
+            
+            addDebugInfo(`Sending test log with severity: ${severity}`);
+            
+            fetch('/graphql', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: `
+                        mutation {
+                            ingestLog(input: {
+                                timestamp: "${timestamp}",
+                                application: "${application}",
+                                message: "${message}",
+                                severity: ${severity},
+                                source: "subscription-test",
+                                host: "local-browser",
+                                metadata: [
+                                    {key: "test", value: "true"},
+                                    {key: "browser", value: "${navigator.userAgent.split(' ')[0]}"}
+                                ]
+                            }) {
+                                id
+                                severity
+                            }
+                        }
+                    `
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Log sent:', data);
+                addDebugInfo(`Log created with ID: ${data.data?.ingestLog?.id}, Severity: ${severity}`);
+            })
+            .catch(error => {
+                console.error('Error sending log:', error);
+                addDebugInfo(`Error creating log: ${error}`);
+            });
+        }
+        
+        // Connect on page load
+        window.onload = function() {
+            connect();
+        };
+        
+        // Disconnect when page is closed
+        window.onbeforeunload = function() {
+            if (socket) {
+                socket.close();
+            }
+        };
+    </script>
+</body>
+</html> 
