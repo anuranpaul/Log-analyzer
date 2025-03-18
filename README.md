@@ -388,15 +388,15 @@ These health checks help identify issues early and assist with diagnosing proble
 
 The Log Analyzer provides comprehensive API documentation to help developers understand and interact with its endpoints.
 
-### API Index
+### API Documentation Hub
 
-A centralized API index is available at:
+A centralized API documentation hub is available through multiple access points:
 
-```
-http://localhost:8080/api/index
-```
-
-This page provides links to all documentation and testing interfaces.
+1. **Main API Index (Thymeleaf UI)**:
+   ```
+   http://localhost:8080/api/index
+   ```
+   This provides a rich, interactive dashboard with categorized API endpoints organized by type (REST, GraphQL, Testing & Monitoring).
 
 ### REST API Documentation
 
