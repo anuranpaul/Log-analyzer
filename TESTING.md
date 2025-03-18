@@ -526,17 +526,20 @@ Remember to always check application logs for specific error messages when troub
    - Elasticsearch health status
    - Kafka health status
    - Zookeeper health status
+   - Detailed metrics section with disk space and memory usage
 
 3. Test the refresh button:
    - Click the "Refresh" button
    - Verify the timestamp updates
    - Verify all health statuses refresh
+   - Confirm metrics data updates
 
 ### 7.2 Testing Component Health Status
 
 1. Test with all services running:
    - All health indicators should show "UP" status
    - Overall status should be "UP"
+   - Disk space and memory metrics should display current usage with progress bars
 
 2. Test with individual services down:
    - Stop Elasticsearch:
@@ -546,6 +549,7 @@ Remember to always check application logs for specific error messages when troub
    - Refresh the health dashboard
    - Elasticsearch status should show "DOWN"
    - Overall status should show "DOWN"
+   - Resource metrics should still be visible
    - Restart Elasticsearch:
      ```bash
      brew services start elasticsearch
@@ -558,7 +562,33 @@ Remember to always check application logs for specific error messages when troub
    - Test Zookeeper health by stopping/starting the Zookeeper service
    - Test Database health by temporarily changing the database credentials in application.properties
 
-### 7.3 Testing the Health API
+### 7.3 Testing Resource Metrics
+
+1. Test disk space metrics:
+   - Verify the disk space usage percentage is displayed correctly
+   - Check that free and total space values are shown
+   - Confirm progress bar color corresponds to usage level (green for normal, yellow for warning, red for critical)
+   - For testing threshold alerts, you can temporarily modify the threshold in application.properties:
+     ```
+     management.health.diskspace.threshold=100GB
+     ```
+     (This will trigger a warning if you have less than 100GB free)
+
+2. Test memory metrics:
+   - Verify JVM memory usage is displayed correctly
+   - Check that used and maximum memory values are shown
+   - Confirm progress bar color corresponds to memory usage level
+   - Generate load to test dynamic updates:
+     ```bash
+     # Generate some load with a simple query that loads many records in memory
+     for i in {1..20}; do
+       curl -s "http://localhost:8080/graphql" -H "Content-Type: application/json" \
+         -d '{"query": "query { logs(page: {page: 0, size: 500}) { content { id message } } }" }' > /dev/null
+     done
+     ```
+   - Refresh the dashboard to see memory usage change
+
+### 7.4 Testing the Health API
 
 1. Access the health API endpoint:
    ```bash
@@ -568,16 +598,25 @@ Remember to always check application logs for specific error messages when troub
 2. Verify the JSON response includes:
    - Overall status
    - Status for each component
-   - Details for each component
+   - Details for each component including:
+     - Disk space metrics (total, free, threshold)
+     - Memory metrics (used, max)
+     - Connection details for services
 
-3. Access specific health components (if applicable):
+3. Access specific health components:
    ```bash
    curl -X GET "http://localhost:8080/actuator/health/elasticsearch"
    curl -X GET "http://localhost:8080/actuator/health/db"
    curl -X GET "http://localhost:8080/actuator/health/kafka"
+   curl -X GET "http://localhost:8080/actuator/health/diskSpace"
    ```
 
-### 7.4 Troubleshooting Health Monitoring
+4. Test the response format with pretty printing:
+   ```bash
+   curl -X GET "http://localhost:8080/api/health" | jq
+   ```
+
+### 7.5 Troubleshooting Health Monitoring
 
 1. If health indicators show "DOWN" status:
    - Check the component's health details for specific error messages
@@ -585,9 +624,138 @@ Remember to always check application logs for specific error messages when troub
    - Check network connectivity if applicable
    - Review application logs for more detailed error information
 
-2. Common health monitoring issues:
+2. If metrics display is not working:
+   - Check browser console for JavaScript errors
+   - Verify that the API endpoint is returning the correct JSON format
+   - Try clearing browser cache and refreshing
+   - Ensure the correct path is being used for API calls
+
+3. Common health monitoring issues:
    - Incorrect connection strings or credentials
    - Network connectivity problems
    - Resource limitations (memory, disk space)
    - Permission issues with external services
-   - Configuration problems in application.properties 
+   - Configuration problems in application.properties
+   - Mismatched data formats between API and frontend
+
+## 8. API Documentation & Testing
+
+The Log Analyzer includes comprehensive API documentation that can be used for testing all aspects of the system.
+
+### 8.1 Accessing API Documentation
+
+1. API Index:
+   ```
+   http://localhost:8080/api/index
+   ```
+   This page provides links to all available documentation and testing interfaces.
+
+2. REST API Documentation (Swagger UI):
+   ```
+   http://localhost:8080/swagger-ui.html
+   ```
+   Interactive documentation for all REST endpoints.
+
+3. GraphQL Examples:
+   ```
+   http://localhost:8080/api-docs/graphql/examples
+   ```
+   Pre-configured examples of common GraphQL operations.
+
+### 8.2 Testing with Swagger UI
+
+1. Navigate to the Swagger UI:
+   ```
+   http://localhost:8080/swagger-ui.html
+   ```
+
+2. Expand the "Log REST API" section to see available endpoints:
+   - Test retrieving logs with various filters
+   - Try creating new logs
+   - View metadata and application information
+
+3. Each endpoint provides:
+   - Request parameter descriptions
+   - Required vs. optional fields
+   - Response schema information
+   - "Try it out" button for live testing
+
+4. To test creating a log:
+   - Expand the POST `/api/logs` endpoint
+   - Click "Try it out"
+   - Modify the example request body
+   - Click "Execute"
+   - Verify the response status code and body
+
+### 8.3 Testing with GraphiQL
+
+1. Navigate to the GraphiQL interface:
+   ```
+   http://localhost:8080/graphiql
+   ```
+
+2. Use the explorer panel (usually on the left) to browse available:
+   - Queries
+   - Mutations
+   - Subscriptions
+   - Types and fields
+
+3. Write a test query:
+   ```graphql
+   query {
+     logs(page: {page: 0, size: 10}) {
+       content {
+         id
+         message
+         severity
+       }
+       totalElements
+     }
+   }
+   ```
+
+4. Click the "Play" button to execute the query
+   - Examine the response
+   - Modify the query to test different fields
+   - Add filters to test search functionality
+
+5. For advanced testing, refer to the GraphQL examples page for more complex query patterns
+
+### 8.4 End-to-End API Testing
+
+1. Create a test workflow combining multiple API calls:
+   - Create a new log using the REST API
+   - Verify the log exists using a GraphQL query
+   - Subscribe to log alerts using the subscription test page
+   - Create another log with a matching severity
+   - Verify the alert is received via the subscription
+   - Check the health dashboard to ensure all components remain healthy
+
+2. Create automated test scripts using tools like Postman, curl, or testing frameworks:
+   ```bash
+   # Example curl command for creating a log via REST API
+   curl -X POST "http://localhost:8080/api/logs" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "timestamp": "2024-03-17T14:32:21Z",
+       "application": "test-app",
+       "message": "API test log",
+       "severity": "INFO",
+       "source": "test-script"
+     }'
+   
+   # Example curl command for querying logs via GraphQL
+   curl -X POST "http://localhost:8080/graphql" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "query": "query { logs(page: {page: 0, size: 10}) { content { id message } } }"
+     }'
+   ```
+
+### 8.5 API Documentation Maintenance
+
+1. Keeping documentation up to date:
+   - When adding new endpoints, ensure they are properly annotated with OpenAPI annotations
+   - Update GraphQL schema when adding new types or operations
+   - Add new examples to the GraphQL examples page for new operations
+   - Update the API index page when adding new documentation resources 

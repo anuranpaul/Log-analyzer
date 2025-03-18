@@ -128,11 +128,11 @@ This architecture provides:
 - Implemented consumer service for processing logs and storing in Elasticsearch
 - Added asynchronous log processing pipeline
 
-### 🔲 Step 4: Implement GraphQL Subscription for Real-time Alerts
+### ✅ Step 4: Implement GraphQL Subscription for Real-time Alerts
 - Basic subscription setup completed
 - Real-time alert filtering by severity
-- WebSocket configuration pending
-- Alert rules engine pending
+- WebSocket configuration completed
+- Alert rules engine completed
 
 ## Setup Instructions
 
@@ -335,6 +335,10 @@ http://localhost:8080/system-health
 This dashboard displays:
 - Overall system health status
 - Individual component health status (PostgreSQL, Elasticsearch, Kafka, Zookeeper)
+- Detailed system metrics with visualizations:
+  - Disk space usage with free/total space information
+  - Memory usage with current consumption metrics
+  - Visual progress bars with color-coded status indicators
 - Real-time updates with automatic refresh
 
 ### Health API
@@ -349,12 +353,14 @@ This endpoint returns a JSON representation of all health indicators, including:
 - Overall system status
 - Component-specific status
 - Detailed health information for each component
+- Resource usage metrics (disk space, memory)
 
 Note: You can also access individual health components via the Actuator endpoints:
 ```
 http://localhost:8080/actuator/health/elasticsearch
 http://localhost:8080/actuator/health/db
 http://localhost:8080/actuator/health/kafka
+http://localhost:8080/actuator/health/diskSpace
 ```
 
 ### Health Indicators
@@ -364,5 +370,75 @@ The application monitors the following components:
 - **Elasticsearch**: Verifies index existence and cluster health
 - **Kafka**: Validates broker availability and topics
 - **Zookeeper**: Confirms service availability and connection state
+- **Disk Space**: Monitors available disk space with configurable thresholds
+- **Memory**: Tracks JVM memory usage with heap and non-heap metrics
+
+### Benefits
+
+The health monitoring system provides several key benefits:
+- **Early Issue Detection**: Identify problems before they affect users
+- **Simplified Troubleshooting**: Quickly pinpoint failing components
+- **Resource Planning**: Monitor disk and memory usage trends
+- **Operational Visibility**: Get a clear overview of all system components
+- **Integration-Ready**: Health data available via REST for external monitoring tools
 
 These health checks help identify issues early and assist with diagnosing problems during deployment and operation.
+
+## API Documentation
+
+The Log Analyzer provides comprehensive API documentation to help developers understand and interact with its endpoints.
+
+### API Index
+
+A centralized API index is available at:
+
+```
+http://localhost:8080/api/index
+```
+
+This page provides links to all documentation and testing interfaces.
+
+### REST API Documentation
+
+The REST API is documented using OpenAPI/Swagger:
+
+```
+http://localhost:8080/swagger-ui.html
+```
+
+Key features:
+- Interactive documentation with try-it-out capability
+- Request/response examples
+- Schema definitions
+- Authorization information
+
+### GraphQL Documentation
+
+GraphQL endpoints are documented in multiple ways:
+
+1. **GraphiQL Interface**:
+   ```
+   http://localhost:8080/graphiql
+   ```
+   An interactive GraphQL IDE with schema exploration and auto-completion.
+
+2. **GraphQL Examples**:
+   ```
+   http://localhost:8080/api-docs/graphql/examples
+   ```
+   A collection of common GraphQL queries, mutations, and subscriptions.
+
+3. **GraphQL Schema**:
+   ```
+   http://localhost:8080/api-docs/graphql/schema
+   ```
+   The raw GraphQL schema definition.
+
+### API Testing
+
+The documentation includes comprehensive testing capabilities:
+
+- **REST API testing** via Swagger UI
+- **GraphQL query testing** via GraphiQL
+- **Subscription testing** via a dedicated test client
+- **Health API monitoring** through the health dashboard
