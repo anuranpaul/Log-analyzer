@@ -1,82 +1,121 @@
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
 type Query {
-    logs(filter: LogFilter, page: PageInput): LogPage
-    log(id: ID!): Log
-    findLogsByApplicationAndSeverity(application: String!, severity: Severity!): [Log]
+  logs(filter: LogFilter, page: PageInput): LogPage
+  log(id: ID!): Log
+  findLogsByApplicationAndSeverity(application: String!, severity: Severity!): [Log]
+  analyzeLogPattern(logMessage: String!): String!
+  getAnomalyAnalysis(logId: ID!): String!
+  getLogsWithAi(limit: Int!): [LogWithAi!]!   # Returns LogWithAi, not Log
 }
 
 type Mutation {
-    ingestLog(input: LogInput!): Log
+  ingestLog(input: LogInput!): Log
+  triggerAnomalyAnalysis: String!
 }
 
 type Subscription {
-    logAlerts(severity: [Severity!]): Log
-    allLogAlerts: Log
+  logAlerts(severity: [Severity!]): Log
+  allLogAlerts: Log
 }
 
 type Log {
-    id: ID!
-    timestamp: String!
-    application: String!
-    message: String!
-    severity: Severity!
-    source: String
-    host: String
-    metadata: [MetadataField]
+  id: ID!
+  timestamp: String!
+  application: String!
+  message: String!
+  severity: Severity!
+  source: String
+  host: String
+  metadata: [MetadataField]
+}
+
+type LogWithAi {
+  id: ID!
+  timestamp: String!
+  application: String!
+  message: String!
+  severity: String!        # Note: String not Severity enum (matches your DTO)
+  source: String
+  host: String
+  metadata: [MetadataField]
+  ai: AiResponse          # AI analysis included
+}
+
+type AiResponse {
+  analysis: String!       # AI's analysis of the log
+  confidence: Float!      # How confident the AI is (0.0 to 1.0)
 }
 
 type MetadataField {
-    key: String!
-    value: String!
+  key: String!
+  value: String!
 }
 
 enum Severity {
-    INFO
-    DEBUG
-    WARNING
-    ERROR
-    CRITICAL
+  INFO
+  DEBUG
+  WARNING
+  ERROR
+  CRITICAL
 }
 
 input LogInput {
-    timestamp: String!
-    application: String!
-    message: String!
-    severity: Severity!
-    source: String
-    host: String
-    metadata: [MetadataInput]
+  timestamp: String!
+  application: String!
+  message: String!
+  severity: Severity!
+  source: String
+  host: String
+  metadata: [MetadataInput]
 }
 
 input MetadataInput {
-    key: String!
-    value: String!
+  key: String!
+  value: String!
 }
 
 input LogFilter {
-    applications: [String!]
-    startTime: String
-    endTime: String
-    severities: [Severity!]
-    messageContains: String
-    sources: [String!]
-    hosts: [String!]
-    metadata: MetadataFilter
+  applications: [String!]
+  startTime: String
+  endTime: String
+  severities: [Severity!]
+  messageContains: String
+  sources: [String!]
+  hosts: [String!]
+  metadata: MetadataFilter
 }
 
 input MetadataFilter {
-    key: String!
-    value: String!
+  key: String!
+  value: String!
 }
 
 input PageInput {
-    page: Int = 0
-    size: Int = 20
+  page: Int = 0
+  size: Int = 20
 }
 
 type LogPage {
-    content: [Log!]
-    totalElements: Int!
-    totalPages: Int!
-    pageNumber: Int!
-    pageSize: Int!
-} 
+  content: [Log!]
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type Anomaly {
+  id: String!
+  type: String!
+  application: String
+  detectedAt: String!
+  severity: String!
+  description: String!
+  aiExplanation: String
+  suggestedAction: String
+  confidence: Float
+}

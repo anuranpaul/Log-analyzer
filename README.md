@@ -169,7 +169,7 @@ curl http://localhost:9200
 
 5. Create Kafka topic:
 ```bash
-/opt/homebrew/opt/kafka/bin/kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic log-events
+  /opt/homebrew/opt/kafka/bin/kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic log-events
 ```
 
 ### Running the application

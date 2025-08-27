@@ -64,3 +64,5 @@ build/
 
 ### Project specific ###
 database_setup.sql.executed 
+
+application.properties
